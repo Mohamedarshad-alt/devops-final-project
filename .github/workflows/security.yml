@@ -61,7 +61,7 @@ jobs:
         run: docker build -f docker/Dockerfile -t devops-final-api:scan .
 
       - name: Scan image for vulnerabilities
-        uses: aquasecurity/trivy-action@0.33.1
+        uses: aquasecurity/trivy-action@master
         with:
           image-ref: devops-final-api:scan
           format: table
