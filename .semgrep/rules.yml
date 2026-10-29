@@ -1,0 +1,13 @@
+rules:
+  - id: express-csrf-not-required-for-current-api
+    pattern: const app = express()
+    paths:
+      include:
+        - app/src/app.js
+    message: >-
+      This API currently uses read-only GET endpoints and does not implement
+      cookie-based authentication. Reassess CSRF protection before adding
+      state-changing endpoints or cookie-based authentication.
+    languages:
+      - javascript
+    severity: INFO
