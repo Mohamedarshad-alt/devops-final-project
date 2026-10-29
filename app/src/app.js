@@ -2,7 +2,6 @@ const express = require('express');
 
 function createApp(pool) {
   const app = express();
-
   app.disable('x-powered-by');
   app.use(express.json({ limit: '100kb' }));
 
