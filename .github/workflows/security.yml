@@ -1,4 +1,3 @@
-
 name: Security Scan
 
 on:
@@ -61,7 +60,7 @@ jobs:
         run: docker build -f docker/Dockerfile -t devops-final-api:scan .
 
       - name: Scan image for vulnerabilities
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.33.1
         with:
           image-ref: devops-final-api:scan
           format: table
