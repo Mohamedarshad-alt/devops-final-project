@@ -29,7 +29,8 @@ function createApp(pool) {
       );
 
       res.status(200).json({
-        items: result.rows
+        count: result.rows.length,
+	items: result.rows
       });
     } catch (error) {
       next(error);
