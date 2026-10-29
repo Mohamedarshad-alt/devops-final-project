@@ -115,3 +115,69 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to EC2 through AWS SSM
+    needs: publish
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Configure AWS credentials using GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::788516091241:role/GitHubActionsDevOpsDeployRole
+          aws-region: ap-south-1
+
+      - name: Send deployment command to EC2
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids i-0f99bd13764bd2b42 \
+            --document-name AWS-RunShellScript \
+            --comment "Deploy DevOps final project from GitHub Actions" \
+            --parameters '{"commands":["set -eu","cd /home/ubuntu/devops-app","docker compose pull api","docker compose up -d --no-deps api","for i in $(seq 1 30); do if curl -fsS http://127.0.0.1:3000/health; then exit 0; fi; sleep 2; done","docker compose logs --tail=80 api","exit 1"]}' \
+            --query 'Command.CommandId' \
+            --output text)
+
+          echo "SSM command ID: $COMMAND_ID"
+
+          for attempt in $(seq 1 60); do
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" \
+              --instance-id i-0f99bd13764bd2b42 \
+              --query 'Status' \
+              --output text 2>/dev/null || true)
+
+            case "$STATUS" in
+              Success)
+                echo "Deployment succeeded."
+                aws ssm get-command-invocation \
+                  --command-id "$COMMAND_ID" \
+                  --instance-id i-0f99bd13764bd2b42 \
+                  --query 'StandardOutputContent' \
+                  --output text
+                exit 0
+                ;;
+              Failed|TimedOut|Cancelled|Cancelling)
+                echo "Deployment failed with status: $STATUS"
+                aws ssm get-command-invocation \
+                  --command-id "$COMMAND_ID" \
+                  --instance-id i-0f99bd13764bd2b42 \
+                  --query '{Status:Status,Output:StandardOutputContent,Error:StandardErrorContent}' \
+                  --output json
+                exit 1
+                ;;
+            esac
+
+            sleep 5
+          done
+
+          echo "Timed out waiting for the SSM command."
+          exit 1
