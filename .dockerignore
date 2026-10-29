@@ -1,0 +1,13 @@
+.git
+.github
+.env
+.env.*
+!.env.example
+**/node_modules
+**/.terraform
+**/terraform.tfstate
+**/terraform.tfstate.*
+**/*.pem
+**/*.key
+**/terraform.tfvars
+**/*.tfplan

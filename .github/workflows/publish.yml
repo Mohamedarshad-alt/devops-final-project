@@ -1,5 +1,4 @@
-
-name: Build and Publish Docker Image
+name: Validate and Publish Docker Image
 
 on:
   push:
@@ -7,20 +6,75 @@ on:
       - main
     tags:
       - "v*"
-
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
   contents: read
-  packages: write
-
-env:
-  REGISTRY: ghcr.io
 
 jobs:
-  publish:
-    name: Build and publish image
+  validate:
+    name: Test and scan application
     runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install dependencies
+        working-directory: app
+        run: npm ci
+
+      - name: Run API tests
+        working-directory: app
+        run: npm test
+
+      - name: Check JavaScript syntax
+        working-directory: app
+        run: |
+          node --check src/app.js
+          node --check src/server.js
+
+      - name: Audit npm dependencies
+        working-directory: app
+        run: npm audit --audit-level=high
+
+      - name: Install Semgrep
+        run: python -m pip install semgrep
+
+      - name: Scan application source
+        run: semgrep scan --config auto app/src
+
+      - name: Build Docker image for scanning
+        run: docker build -f docker/Dockerfile -t devops-final-api:scan .
+
+      - name: Scan Docker image with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: devops-final-api:scan
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+  publish:
+    name: Publish image to GHCR
+    needs: validate
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - name: Checkout repository
