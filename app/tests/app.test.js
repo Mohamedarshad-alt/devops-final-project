@@ -63,3 +63,21 @@ test("unknown routes return 404", async () => {
 
   assert.equal(response.status, 404);
 });
+test("GET /metrics exposes Prometheus metrics", async () => {
+  const pool = {
+    query: async () => ({ rows: [{ "?column?": 1 }] })
+  };
+
+  const app = createApp(pool);
+
+  // Generate a request so the HTTP metrics have data.
+  await request(app).get("/health");
+
+  const response = await request(app).get("/metrics");
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers["content-type"], /text\/plain/);
+  assert.match(response.text, /http_requests_total/);
+  assert.match(response.text, /http_request_duration_seconds/);
+  assert.match(response.text, /process_resident_memory_bytes/);
+});
