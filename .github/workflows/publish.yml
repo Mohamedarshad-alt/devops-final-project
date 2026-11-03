@@ -1,4 +1,4 @@
-name: Validate and Publish Docker Image
+name: Validate, Publish and Deploy Docker Image
 
 on:
   push:
@@ -103,7 +103,7 @@ jobs:
           tags: |
             type=ref,event=branch
             type=ref,event=tag
-            type=sha,format=short,prefix=sha-
+            type=sha,format=long,prefix=sha-
 
       - name: Build and publish Docker image
         uses: docker/build-push-action@v6
@@ -117,7 +117,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   deploy:
-    name: Deploy to EC2 through AWS SSM
+    name: Deploy to EC2 with automatic rollback
     environment: production
     needs: publish
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -134,16 +134,120 @@ jobs:
           role-to-assume: arn:aws:iam::788516091241:role/GitHubActionsDevOpsDeployRole
           aws-region: ap-south-1
 
-      - name: Send deployment command to EC2
+      - name: Deploy with automatic rollback
         shell: bash
+        env:
+          DEPLOY_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
+
+          NEW_IMAGE="ghcr.io/mohamedarshad-alt/devops-final-project:sha-${DEPLOY_SHA}"
+
+          echo "Image to deploy: ${NEW_IMAGE}"
+
+          SCRIPT=$(cat <<'REMOTE_SCRIPT'
+          set -eu
+
+          cd /home/ubuntu/devops-app
+
+          NEW_IMAGE="__NEW_IMAGE__"
+
+          echo "Identifying the currently running API container..."
+
+          CONTAINER_ID=$(docker compose ps -q api)
+
+          if [ -z "$CONTAINER_ID" ]; then
+            echo "ERROR: No API container found. Aborting safely."
+            exit 1
+          fi
+
+          CURRENT_IMAGE_ID=$(docker inspect --format '{{.Image}}' "$CONTAINER_ID")
+
+          PREVIOUS_IMAGE=$(docker image inspect \
+            --format '{{range .RepoDigests}}{{println .}}{{end}}' \
+            "$CURRENT_IMAGE_ID" |
+            grep '^ghcr.io/mohamedarshad-alt/devops-final-project@sha256:' |
+            head -n 1 || true)
+
+          if [ -z "$PREVIOUS_IMAGE" ]; then
+            echo "ERROR: Could not identify the previous GHCR image digest."
+            echo "Aborting without changing the running application."
+            exit 1
+          fi
+
+          echo "Previous image: $PREVIOUS_IMAGE"
+          echo "New image: $NEW_IMAGE"
+
+          echo "Pulling the new image..."
+
+          if ! API_IMAGE="$NEW_IMAGE" docker compose pull api; then
+            echo "ERROR: New image pull failed. Existing application remains unchanged."
+            exit 1
+          fi
+
+          rollback() {
+            echo "Starting rollback to the previous image..."
+
+            if ! API_IMAGE="$PREVIOUS_IMAGE" docker compose up -d --no-deps api; then
+              echo "CRITICAL: Rollback command failed."
+              docker compose logs --tail=100 api || true
+              exit 1
+            fi
+
+            echo "Checking previous application health..."
+
+            for i in $(seq 1 30); do
+              if curl -fsS http://127.0.0.1:3000/health; then
+                echo
+                echo "ROLLBACK SUCCESSFUL: Previous version is healthy."
+                echo "Deployment failed, but the previous version was restored."
+                exit 1
+              fi
+
+              sleep 2
+            done
+
+            echo "CRITICAL: Previous version failed its health check."
+            docker compose logs --tail=100 api || true
+            exit 1
+          }
+
+          echo "Deploying the new application image..."
+
+          if ! API_IMAGE="$NEW_IMAGE" docker compose up -d --no-deps api; then
+            echo "ERROR: New deployment command failed."
+            rollback
+          fi
+
+          echo "Checking new application health..."
+
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3000/health; then
+              echo
+              echo "DEPLOYMENT SUCCESSFUL: New version is healthy."
+              exit 0
+            fi
+
+            sleep 2
+          done
+
+          echo "ERROR: New version failed its health check."
+          docker compose logs --tail=80 api || true
+
+          rollback
+          REMOTE_SCRIPT
+          )
+
+          SCRIPT="${SCRIPT//__NEW_IMAGE__/$NEW_IMAGE}"
+
+          jq -n --arg script "$SCRIPT" \
+            '{commands: [$script]}' > ssm-parameters.json
 
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids i-0f99bd13764bd2b42 \
             --document-name AWS-RunShellScript \
-            --comment "Deploy DevOps final project from GitHub Actions" \
-            --parameters '{"commands":["set -eu","cd /home/ubuntu/devops-app","docker compose pull api","docker compose up -d --no-deps api","for i in $(seq 1 30); do if curl -fsS http://127.0.0.1:3000/health; then exit 0; fi; sleep 2; done","docker compose logs --tail=80 api","exit 1"]}' \
+            --comment "Deploy commit ${DEPLOY_SHA} with automatic rollback" \
+            --parameters file://ssm-parameters.json \
             --query 'Command.CommandId' \
             --output text)
 
@@ -159,20 +263,25 @@ jobs:
             case "$STATUS" in
               Success)
                 echo "Deployment succeeded."
+
                 aws ssm get-command-invocation \
                   --command-id "$COMMAND_ID" \
                   --instance-id i-0f99bd13764bd2b42 \
                   --query 'StandardOutputContent' \
                   --output text
+
                 exit 0
                 ;;
+
               Failed|TimedOut|Cancelled|Cancelling)
-                echo "Deployment failed with status: $STATUS"
+                echo "Deployment or rollback failed: $STATUS"
+
                 aws ssm get-command-invocation \
                   --command-id "$COMMAND_ID" \
                   --instance-id i-0f99bd13764bd2b42 \
                   --query '{Status:Status,Output:StandardOutputContent,Error:StandardErrorContent}' \
                   --output json
+
                 exit 1
                 ;;
             esac
