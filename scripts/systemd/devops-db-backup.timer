@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily DevOps PostgreSQL backup timer
+
+[Timer]
+OnCalendar=*-*-* 02:00:00 UTC
+Persistent=true
+Unit=devops-db-backup.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,9 @@
+[Unit]
+Description=DevOps PostgreSQL database backup
+Wants=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/backup-devops-db.sh

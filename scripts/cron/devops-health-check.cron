@@ -1,0 +1,1 @@
+*/15 * * * * /usr/local/bin/devops-health-check.sh >> /var/log/devops-monitoring/health.log 2>&1
