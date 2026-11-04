@@ -1,0 +1,42 @@
+---
+- name: Install Docker on test EC2
+  hosts: test_ec2
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Update Ubuntu package cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install Docker Engine and Compose plugin
+      ansible.builtin.apt:
+        name:
+          - docker.io
+          - docker-compose-v2
+        state: present
+
+    - name: Enable and start Docker service
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Verify Docker Engine installation
+      ansible.builtin.command:
+        cmd: docker --version
+      changed_when: false
+      register: docker_version
+
+    - name: Verify Docker Compose installation
+      ansible.builtin.command:
+        cmd: docker compose version
+      changed_when: false
+      register: compose_version
+
+    - name: Display installed versions
+      ansible.builtin.debug:
+        msg:
+          - "{{ docker_version.stdout }}"
+          - "{{ compose_version.stdout }}"

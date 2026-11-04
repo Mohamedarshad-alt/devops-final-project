@@ -1,0 +1,52 @@
+- name: Configure 1 GB swap on test EC2
+  hosts: test_ec2
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Check whether swap file already exists
+      ansible.builtin.stat:
+        path: /swapfile
+      register: swapfile
+
+    - name: Create 1 GB swap file
+      ansible.builtin.command:
+        cmd: fallocate -l 1G /swapfile
+        creates: /swapfile
+      when: not swapfile.stat.exists
+
+    - name: Set secure swap file permissions
+      ansible.builtin.file:
+        path: /swapfile
+        owner: root
+        group: root
+        mode: "0600"
+
+    - name: Check whether swap file is already formatted
+      ansible.builtin.command:
+        cmd: blkid /swapfile
+      register: swap_format
+      changed_when: false
+      failed_when: false
+
+    - name: Format swap file
+      ansible.builtin.command:
+        cmd: mkswap /swapfile
+      when: swap_format.rc != 0
+
+    - name: Check active swap devices
+      ansible.builtin.command:
+        cmd: swapon --show=NAME --noheadings
+      register: active_swap
+      changed_when: false
+
+    - name: Enable swap file
+      ansible.builtin.command:
+        cmd: swapon /swapfile
+      when: "'/swapfile' not in active_swap.stdout"
+
+    - name: Make swap persistent after reboot
+      ansible.builtin.lineinfile:
+        path: /etc/fstab
+        line: "/swapfile none swap sw 0 0"
+        state: present

@@ -1,0 +1,70 @@
+- name: Prepare isolated test application deployment
+  hosts: test_ec2
+  become: true
+  gather_facts: false
+
+  vars:
+    deployment_dir: /opt/devops-test
+    postgres_user: devops_test_user
+    postgres_db: devops_test_db
+    api_image: "ghcr.io/mohamedarshad-alt/devops-final-project:sha-dc985bea520b1006bc8bbe015c8cb50badfa7a67"
+
+  tasks:
+    - name: Create test deployment directory
+      ansible.builtin.file:
+        path: "{{ deployment_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0750"
+
+    - name: Install OpenSSL for secure password generation
+      ansible.builtin.apt:
+        name: openssl
+        state: present
+        update_cache: false
+
+    - name: Generate test environment file if it does not exist
+      ansible.builtin.shell:
+        cmd: |
+          umask 077
+          password="$(openssl rand -hex 32)"
+          printf 'POSTGRES_USER=%s\nPOSTGRES_PASSWORD=%s\nPOSTGRES_DB=%s\nAPI_IMAGE=%s\n' \
+            '{{ postgres_user }}' "$password" \
+            '{{ postgres_db }}' '{{ api_image }}' > .env
+        chdir: "{{ deployment_dir }}"
+        creates: "{{ deployment_dir }}/.env"
+      no_log: true
+
+    - name: Set secure environment file permissions
+      ansible.builtin.file:
+        path: "{{ deployment_dir }}/.env"
+        owner: root
+        group: root
+        mode: "0600"
+
+    - name: Copy test Docker Compose file
+      ansible.builtin.copy:
+        src: ../files/test-compose.yml
+        dest: "{{ deployment_dir }}/compose.yml"
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Copy database schema
+      ansible.builtin.copy:
+        src: ../../../app/db/schema.sql
+        dest: "{{ deployment_dir }}/schema.sql"
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Validate Docker Compose configuration
+      ansible.builtin.command:
+        cmd: docker compose --env-file .env -f compose.yml config --quiet
+        chdir: "{{ deployment_dir }}"
+      changed_when: false
+
+    - name: Display preparation result
+      ansible.builtin.debug:
+        msg: "Test deployment files are prepared and Docker Compose configuration is valid. No containers were started."

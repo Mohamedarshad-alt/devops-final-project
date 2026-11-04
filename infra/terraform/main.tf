@@ -106,3 +106,58 @@ resource "aws_instance" "app" {
     Project = var.project_name
   }
 }
+
+# Look up the existing IAM instance profile.
+# This profile already has SSM and CloudWatch permissions.
+data "aws_iam_instance_profile" "devops_ssm" {
+  name = "DevOpsFinalProjectSSMRole"
+}
+
+# Separate security group for the test EC2 instance.
+resource "aws_security_group" "test" {
+  name        = "${var.project_name}-test-sg"
+  description = "Outbound access only for test EC2 through SSM"
+  vpc_id      = data.aws_vpc.default.id
+
+  egress {
+    description = "Outbound traffic for SSM and system updates"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name        = "${var.project_name}-test-sg"
+    Project     = var.project_name
+    Environment = "test"
+  }
+}
+
+# Separate test EC2 instance.
+resource "aws_instance" "test" {
+  ami                         = data.aws_ami.ubuntu.id
+  instance_type               = var.instance_type
+  subnet_id                   = data.aws_subnet.selected.id
+  vpc_security_group_ids      = [aws_security_group.test.id]
+  iam_instance_profile        = data.aws_iam_instance_profile.devops_ssm.name
+  associate_public_ip_address = true
+
+  root_block_device {
+    volume_size           = 12
+    volume_type           = "gp3"
+    encrypted             = true
+    delete_on_termination = true
+  }
+
+  metadata_options {
+    http_endpoint = "enabled"
+    http_tokens   = "required"
+  }
+
+  tags = {
+    Name        = "${var.project_name}-test-ec2"
+    Project     = var.project_name
+    Environment = "test"
+  }
+}

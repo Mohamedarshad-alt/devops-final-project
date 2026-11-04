@@ -17,3 +17,6 @@ __pycache__/
 *.log
 .DS_Store
 .vscode/
+
+# Downloaded Ansible collections
+infra/ansible/collections/
