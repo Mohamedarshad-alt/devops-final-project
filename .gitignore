@@ -20,3 +20,13 @@ __pycache__/
 
 # Downloaded Ansible collections
 infra/ansible/collections/
+
+# Local Ansible inventory containing real server details
+infra/ansible/inventory.local.ini
+
+# Temporary rollback and Terraform backups
+*.before-auto-rollback
+*.before-test-instance
+
+# Real local Ansible inventory
+infra/ansible/inventory.ini
