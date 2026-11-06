@@ -1,0 +1,20 @@
+test-server | SUCCESS => {
+    "changed": false,
+    "connection": "close",
+    "content": "{\"status\":\"healthy\",\"database\":\"connected\"}",
+    "content_length": "43",
+    "content_type": "application/json; charset=utf-8",
+    "cookies": {},
+    "cookies_string": "",
+    "date": "Thu, 05 Nov 2026 07:42:22 GMT",
+    "elapsed": 0,
+    "etag": "W/\"2b-0uLyC4BG00O4uoU4k3RzId1VBOE\"",
+    "json": {
+        "database": "connected",
+        "status": "healthy"
+    },
+    "msg": "OK (43 bytes)",
+    "redirected": false,
+    "status": 200,
+    "url": "http://127.0.0.1:3000/health"
+}

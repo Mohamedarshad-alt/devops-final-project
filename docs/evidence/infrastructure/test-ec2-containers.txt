@@ -1,0 +1,4 @@
+test-server | CHANGED | rc=0 >>
+NAME                IMAGE                                                                                         COMMAND                  SERVICE   CREATED        STATUS                 PORTS
+devops-test-api-1   ghcr.io/mohamedarshad-alt/devops-final-project:sha-dc985bea520b1006bc8bbe015c8cb50badfa7a67   "docker-entrypoint.s…"   api       22 hours ago   Up 3 hours             127.0.0.1:3000->3000/tcp
+devops-test-db-1    postgres:16-alpine                                                                            "docker-entrypoint.s…"   db        25 hours ago   Up 3 hours (healthy)   5432/tcp

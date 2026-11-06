@@ -1,0 +1,31 @@
+test-server | SUCCESS => {
+    "changed": false,
+    "connection": "close",
+    "content": "{\"count\":2,\"items\":[{\"id\":\"1\",\"name\":\"DevOps Pipeline\",\"description\":\"Automated build, test, scan and deployment\"},{\"id\":\"2\",\"name\":\"Monitoring Dashboard\",\"description\":\"Application and infrastructure monitoring\"}]}",
+    "content_length": "215",
+    "content_type": "application/json; charset=utf-8",
+    "cookies": {},
+    "cookies_string": "",
+    "date": "Thu, 05 Nov 2026 07:43:15 GMT",
+    "elapsed": 0,
+    "etag": "W/\"d7-6oYaslpzrC/9gyubVJa9QvxDvhw\"",
+    "json": {
+        "count": 2,
+        "items": [
+            {
+                "description": "Automated build, test, scan and deployment",
+                "id": "1",
+                "name": "DevOps Pipeline"
+            },
+            {
+                "description": "Application and infrastructure monitoring",
+                "id": "2",
+                "name": "Monitoring Dashboard"
+            }
+        ]
+    },
+    "msg": "OK (215 bytes)",
+    "redirected": false,
+    "status": 200,
+    "url": "http://127.0.0.1:3000/api/v1/items"
+}

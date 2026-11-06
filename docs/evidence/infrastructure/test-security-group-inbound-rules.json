@@ -1,0 +1,8 @@
+[
+    {
+        "GroupName": "devops-final-project-test-sg",
+        "GroupId": "sg-0e3309aa227482a35",
+        "Description": "Outbound access only for test EC2 through SSM",
+        "InboundRules": []
+    }
+]

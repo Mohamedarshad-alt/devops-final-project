@@ -1,0 +1,22 @@
+POST-DEPLOYMENT HEALTH CHECK EVIDENCE
+
+Repository:
+Mohamedarshad-alt/devops-final-project
+
+Workflow:
+Validate, Publish and Deploy Docker Image
+
+Run:
+#11
+
+Workflow URL:
+https://github.com/Mohamedarshad-alt/devops-final-project/actions/runs/41815240218
+
+Health-check step:
+Green / Successful
+
+Result:
+The post-deployment health-check step completed successfully.
+
+Health response recorded in the deployment logs:
+{"status":"healthy","database":"connected"}

@@ -1,0 +1,10 @@
+Terraform plan summary
+=======================
+Terraform version: 1.16.6
+Resources in plan: 4
+aws_instance.app -> no-op
+aws_instance.test -> create
+aws_security_group.app -> no-op
+aws_security_group.test -> create
+
+No resources were applied. This is an inspection of the saved plan only.

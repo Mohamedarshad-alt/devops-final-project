@@ -1,0 +1,48 @@
+
+PLAY [Deploy and validate application on isolated test EC2] ********************
+
+TASK [Deploy application using Docker Compose] *********************************
+Exception ignored in: <function Connection.__del__ at 0x7435361532e0>
+Traceback (most recent call last):
+  File "/home/arshad/.ansible/collections/ansible_collections/community/aws/plugins/connection/aws_ssm.py", line 496, in __del__
+    self.close()
+  File "/home/arshad/.ansible/collections/ansible_collections/community/aws/plugins/connection/aws_ssm.py", line 966, in close
+    self._session.communicate(cmd)
+  File "/usr/lib/python3.12/subprocess.py", line 1184, in communicate
+    raise ValueError("Cannot send input after starting communication")
+ValueError: Cannot send input after starting communication
+changed: [test-server]
+
+TASK [Display Docker Compose deployment result] ********************************
+ok: [test-server] => {
+    "compose_result.stdout_lines": []
+}
+
+TASK [Wait for API port 3000] **************************************************
+ok: [test-server]
+
+TASK [Check API health endpoint] ***********************************************
+ok: [test-server]
+
+TASK [Verify API and database health] ******************************************
+ok: [test-server] => {
+    "changed": false,
+    "msg": "API is healthy and connected to PostgreSQL."
+}
+
+TASK [Check application items endpoint] ****************************************
+ok: [test-server]
+
+TASK [Verify application items response] ***************************************
+ok: [test-server] => {
+    "changed": false,
+    "msg": "Items API is working and returning valid data."
+}
+
+TASK [Display deployment success] **********************************************
+ok: [test-server] => {
+    "msg": "Test application deployment and health validation completed successfully."
+}
+
+PLAY RECAP *********************************************************************
+test-server                : ok=8    changed=1    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0

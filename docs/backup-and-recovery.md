@@ -61,7 +61,7 @@ The restoration procedure was:
 3. Create a separate test database.
 4. Restore the backup into the test database.
 5. Verify the restored tables and records.
-6. Remove the temporary test database.
+6. Retain the isolated test database for verification. Do not delete it as part of the documented test.
 
 Example restoration command:
 
@@ -73,29 +73,42 @@ sudo docker exec -i devops-app-db-1 \
   < /tmp/devops-restore-test/devopsdb.dump
 ```
 
-The test database contained the expected `public.items` table and two records.
+The isolated test database `devops_restore_test` contained the expected `public.items` table and two verified records:
 
-The production database was not overwritten during this test.
+- `DevOps Pipeline` — `Automated build, test, scan and deployment`
+- `Monitoring Dashboard` — `Application and infrastructure monitoring`
+
+The test database was retained after verification. The production database was not overwritten during this test.
 
 ## 6. Application Version Rollback
 
-Application rollback was tested using a previously published Docker image.
+The GitHub Actions publishing workflow implements automatic rollback
+to the previously running API image digest when deployment or the new
+version's health check fails.
 
-The process was:
+The implementation was reviewed and confirms these steps:
 
-1. Record the currently deployed image.
-2. Back up the Docker Compose configuration.
-3. Change the API image to the previous image tag.
-4. Validate the Compose configuration.
-5. Recreate only the API service.
-6. Check application health.
-7. Restore the original Compose configuration.
-8. Redeploy the original API image.
-9. Verify application and database health.
+1. Identify the currently running API container.
+2. Retrieve its previous GHCR image digest.
+3. Pull the new image without first replacing the running container.
+4. Deploy the new API image.
+5. Check the new application's health.
+6. If deployment or health verification fails, recreate the API using
+   the previous image digest.
+7. Check the previous application's health and report the rollback result.
 
-The previous version returned a successful health response.
+A successful deployment was verified, and its logs showed the previous
+image digest before the new image was deployed. This successful deployment
+did not trigger the image rollback function.
 
-The original version was then redeployed successfully.
+A separate rollback simulation was completed on an isolated test EC2
+instance. It temporarily changed the API host port mapping, verified that
+the original port became unavailable, restored the original Docker Compose
+configuration, and verified API health again.
+
+A separate manual image-digest rollback test was completed successfully on the isolated test EC2. The newer image was deployed, then the previous immutable image digest was restored and API and database health were verified.
+
+This manual test does not exercise the GitHub Actions automatic failure-triggered rollback path. That path remains untested. Production was not modified.
 
 ## 7. Application Recovery Test
 
@@ -121,7 +134,7 @@ The PostgreSQL database remained available.
 - The application and database currently run on the same EC2 instance.
 - The instance is a single point of failure.
 - The database backup process depends on the EC2 instance and its scheduled job.
-- Automated application rollback is not yet integrated into GitHub Actions.
+- The GitHub Actions publishing workflow implements automatic rollback to the previous API image digest. Manual image-digest rollback was tested successfully on the isolated test EC2, but the automatic failure-and-recovery path has not been tested.
 - High availability and cross-region disaster recovery are not implemented.
 
 ## 10. Recovery Test Result
@@ -132,6 +145,5 @@ The following operations were successfully tested:
 - Backup file inspected.
 - Database restored to a separate test database.
 - Restored tables and records verified.
-- Previous application image deployed.
-- Original application image restored.
+- Isolated configuration rollback simulation completed.
 - API health verified after recovery.

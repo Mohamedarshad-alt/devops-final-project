@@ -1,0 +1,37 @@
+GITHUB CONTAINER REGISTRY (GHCR) EVIDENCE
+
+Repository:
+Mohamedarshad-alt/devops-final-project
+
+Package:
+devops-final-project
+
+Package URL:
+https://github.com/Mohamedarshad-alt/devops-final-project/pkgs/container/devops-final-project
+
+Registry:
+ghcr.io
+
+Image:
+ghcr.io/mohamedarshad-alt/devops-final-project
+
+Visibility:
+Public
+
+Latest displayed image tag:
+sha-53c5494dbd728128242c09fed434517278fc83a0
+
+Additional displayed tag:
+main
+
+Architecture:
+linux/amd64
+
+Total downloads shown:
+28
+
+Evidence source:
+GitHub Container Registry package page.
+
+Note:
+The package page was inspected on 2026-11-05.

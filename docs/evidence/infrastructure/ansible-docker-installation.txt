@@ -1,0 +1,40 @@
+
+PLAY [Install Docker on test EC2] **********************************************
+
+TASK [Gathering Facts] *********************************************************
+ok: [test-server]
+
+TASK [Update Ubuntu package cache] *********************************************
+changed: [test-server]
+
+TASK [Install Docker Engine and Compose plugin] ********************************
+ok: [test-server]
+
+TASK [Enable and start Docker service] *****************************************
+ok: [test-server]
+
+TASK [Verify Docker Engine installation] ***************************************
+ok: [test-server]
+
+TASK [Verify Docker Compose installation] **************************************
+Exception ignored in: <function Connection.__del__ at 0x730e5cf53e20>
+Traceback (most recent call last):
+  File "/home/arshad/.ansible/collections/ansible_collections/community/aws/plugins/connection/aws_ssm.py", line 496, in __del__
+    self.close()
+  File "/home/arshad/.ansible/collections/ansible_collections/community/aws/plugins/connection/aws_ssm.py", line 966, in close
+    self._session.communicate(cmd)
+  File "/usr/lib/python3.12/subprocess.py", line 1184, in communicate
+    raise ValueError("Cannot send input after starting communication")
+ValueError: Cannot send input after starting communication
+ok: [test-server]
+
+TASK [Display installed versions] **********************************************
+ok: [test-server] => {
+    "msg": [
+        "Docker version 29.1.3, build 29.1.3-0ubuntu3~24.04.2",
+        "Docker Compose version 2.40.3+ds1-0ubuntu1~24.04.1"
+    ]
+}
+
+PLAY RECAP *********************************************************************
+test-server                : ok=7    changed=1    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0

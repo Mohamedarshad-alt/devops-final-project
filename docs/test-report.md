@@ -22,10 +22,15 @@
 | Test | Expected Result | Status |
 |---|---|---|
 | Terraform configuration validation | No configuration errors | PASS |
-| EC2 provisioning | EC2 instance available | PASS |
+| Terraform plan review | Plan generated and reviewed; no resources applied | PASS |
 | Security group configuration | Required ports configured | PASS |
 | Ansible connectivity | Successful ping | PASS |
 | Ansible Docker installation playbook | No failed or unreachable tasks | PASS |
+| Isolated test EC2 application deployment | Ansible deployment playbook completed; 8 tasks passed | PASS |
+| Test EC2 API container | Running with expected GHCR image | PASS |
+| Test EC2 PostgreSQL container | Running and healthy | PASS |
+| Test EC2 API health and database connectivity | healthy; database connected | PASS |
+| Test EC2 items endpoint | HTTP 200; two valid records returned | PASS |
 | Docker service | Active | PASS |
 | Docker Compose | Available | PASS |
 
@@ -48,13 +53,13 @@
 | Gitleaks | Workflow passes | PASS |
 | Semgrep | Workflow passes | PASS |
 | npm audit | Workflow passes | PASS |
-| Trivy image scan | No HIGH/CRITICAL findings at scan time | PASS |
+| Trivy image scan | Scan job completed successfully; detailed findings require review | PASS (execution) |
 | Docker container hardening | Security options configured | PASS |
 | Database public access | Not publicly exposed | PASS |
 | Terraform state Git exclusion | State files ignored and untracked | PASS |
-| Production environment reviewer enforcement | Requires verification | PENDING |
+| Production environment protection | Reviewer configured; self-review prevention disabled; deployment branch policy not configured | PARTIAL |
 | HTTPS certificate and redirection | Not implemented | PENDING |
-| Remote Terraform state | Not implemented | PENDING |
+| Remote Terraform state | S3 backend verified; encryption and versioning enabled | PASS |
 
 ## 6. Monitoring and Logging Tests
 
@@ -70,7 +75,7 @@
 | API service-down alert rule | Configured | PASS |
 | API stop and recovery test | API healthy after restart | PASS |
 | CloudWatch CPU alarm | Configured and email received | PASS |
-| Grafana SMTP email delivery | Successful delivery | PENDING |
+| Grafana SMTP email delivery | Not configured; email delivery remains pending | PENDING |
 
 ## 7. Backup and Recovery Tests
 
@@ -82,8 +87,9 @@
 | S3 encryption | Enabled | PASS |
 | Database dump inspection | Dump readable by pg_restore | PASS |
 | Isolated database restoration | Tables and records restored | PASS |
-| Previous application version deployment | Previous version runs | PASS |
-| Original application version restoration | Original version runs | PASS |
+| Isolated application configuration rollback | Original configuration restored and API recovered | PASS |
+| Manual application image-digest rollback on isolated test EC2 | Previous immutable image restored; API and database health verified | PASS |
+| Automatic GitHub Actions image rollback after deployment failure | Failure-triggered recovery path not exercised | NOT TESTED |
 | Final API health verification | Healthy with database connected | PASS |
 
 ## 8. Known Limitations
@@ -91,15 +97,31 @@
 1. The project currently runs on one EC2 instance.
 2. HTTPS certificate installation and HTTP-to-HTTPS redirection are pending.
 3. Grafana SMTP email delivery is not configured.
-4. Terraform state is local rather than stored in a remote backend.
-5. Automated rollback is not implemented in the GitHub Actions workflow.
-6. Mandatory production reviewer enforcement needs verification.
+4. Terraform uses an S3 remote backend with encryption, versioning and native lock-file configuration.
+5. Manual Docker image-digest rollback was successfully tested on the isolated test EC2. Automatic GitHub Actions image rollback after a failed deployment has not been deliberately tested.
+6. A required production reviewer is configured. Self-review prevention is disabled, and no deployment branch policy is configured.
 7. High availability and cross-region disaster recovery are not implemented.
 
 ## 9. Overall Result
 
-The main application deployment, infrastructure automation, CI/CD, security scanning, monitoring setup, database backup, isolated restoration and manual application rollback have been implemented and tested.
+The main application deployment, infrastructure automation, CI/CD workflows,
+security scanning, database backup, isolated database restoration and
+application health validation have been implemented and tested.
 
-The pending items are listed separately and should not be represented as completed.
+A manual Docker image-digest rollback was successfully completed on the
+isolated test EC2. The previous image was restored and API health and
+database connectivity were verified. A separate configuration rollback
+simulation was also completed. Automatic GitHub Actions image rollback
+triggered by a failed deployment remains untested.
 
-This report reflects the tests performed and evidence available during project implementation.
+The project has also verified the isolated Ansible application deployment,
+including API health, PostgreSQL connectivity and application data retrieval.
+
+HTTPS, Grafana SMTP delivery, strict independent production approval,
+high availability and cross-region disaster recovery remain limitations
+or pending items. Additional Prometheus and Grafana implementation work
+is excluded from the remaining project scope.
+
+This report distinguishes implemented features, completed tests and
+remaining verification. It reflects the evidence captured and reviewed
+during project implementation.

@@ -136,6 +136,6 @@ Before production restoration:
 
 - HTTPS certificate configuration is pending because a domain has not been configured.
 - Grafana SMTP email delivery is not configured.
-- Application rollback is manual; automated rollback is not implemented.
-- Terraform state uses local state rather than a remote backend.
+- Manual image-digest rollback was successfully tested on the isolated test EC2, and a separate configuration rollback simulation was completed. The GitHub Actions automatic failure-triggered image rollback path has not been tested.
+- Terraform state is stored in an encrypted, versioned S3 remote backend with native S3 lock-file configuration. Concurrent locking behavior has not been independently tested.
 - The deployment uses one EC2 instance and has a single point of failure.

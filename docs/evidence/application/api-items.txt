@@ -1,0 +1,10 @@
+test-server | CHANGED | rc=0 >>
+HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+Content-Length: 215
+ETag: W/"d7-6oYaslpzrC/9gyubVJa9QvxDvhw"
+Date: Thu, 05 Nov 2026 09:40:05 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"count":2,"items":[{"id":"1","name":"DevOps Pipeline","description":"Automated build, test, scan and deployment"},{"id":"2","name":"Monitoring Dashboard","description":"Application and infrastructure monitoring"}]}

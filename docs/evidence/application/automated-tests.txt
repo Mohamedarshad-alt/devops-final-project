@@ -1,0 +1,49 @@
+
+> devops-final-api@1.0.0 test
+> node --test
+
+TAP version 13
+# Subtest: GET /health returns healthy when database responds
+ok 1 - GET /health returns healthy when database responds
+  ---
+  duration_ms: 25.347788
+  type: 'test'
+  ...
+# Subtest: GET /health returns 503 when database is unavailable
+ok 2 - GET /health returns 503 when database is unavailable
+  ---
+  duration_ms: 7.558333
+  type: 'test'
+  ...
+# Subtest: GET /api/v1/items returns database records
+ok 3 - GET /api/v1/items returns database records
+  ---
+  duration_ms: 5.135965
+  type: 'test'
+  ...
+# Subtest: unknown routes return 404
+ok 4 - unknown routes return 404
+  ---
+  duration_ms: 3.842521
+  type: 'test'
+  ...
+# Subtest: GET /metrics exposes Prometheus metrics
+ok 5 - GET /metrics exposes Prometheus metrics
+  ---
+  duration_ms: 12.5151
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 329.747849
+npm notice
+npm notice New major version of npm available! 10.9.9 -> 12.2.2
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.2
+npm notice To update run: npm install -g npm@12.2.2
+npm notice

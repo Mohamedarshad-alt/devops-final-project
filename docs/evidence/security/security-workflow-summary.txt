@@ -1,0 +1,45 @@
+SECURITY WORKFLOW EVIDENCE
+
+Repository:
+Mohamedarshad-alt/devops-final-project
+
+Workflow:
+Security Scan
+
+Run:
+#20
+
+Commit:
+53c5494
+
+Branch:
+main
+
+Date:
+2026-11-04
+
+Overall status:
+Success
+
+Workflow URL:
+https://github.com/Mohamedarshad-alt/devops-final-project/actions/runs/41815240255
+
+Completed jobs:
+1. npm dependency scan - Success
+2. Semgrep source scan - Success
+3. Trivy Docker image scan - Success
+4. Gitleaks secret scan - Success
+
+Artifact:
+gitleaks-results.sarif
+
+Artifact size:
+6.65 KB
+
+GitHub annotations:
+4 warnings and 4 notices concerning Node.js 20 deprecation
+and ubuntu-latest runner migration.
+
+Important:
+Successful job completion does not establish zero vulnerabilities
+or zero secret findings. Detailed scan results require inspection.

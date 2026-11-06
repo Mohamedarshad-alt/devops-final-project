@@ -1,0 +1,12 @@
+--------------------------------------------------
+|                DescribeInstances               |
++-------------------+----------------------------+
+|  AvailabilityZone |  ap-south-1c               |
+|  InstanceId       |  i-0c4f68769d3bd1b69       |
+|  InstanceType     |  t3.micro                  |
+|  PrivateIP        |  172.31.21.69              |
+|  PublicIP         |  13.205.25.86              |
+|  State            |  running                   |
+|  SubnetId         |  subnet-036bf076330d221cb  |
+|  VpcId            |  vpc-0a55f276460c1a21d     |
++-------------------+----------------------------+

@@ -1,4 +1,4 @@
-# Automatic Deployment Rollback Test
+# Isolated Docker Compose Configuration Rollback Simulation
 
 ## Test Information
 
@@ -11,7 +11,7 @@
 
 ## Objective
 
-Verify that the deployment rollback mechanism can restore
+Verify that the configuration restoration function can restore
 the previous application configuration when a deployment
 causes the original API endpoint to become unavailable.
 
@@ -23,7 +23,7 @@ causes the original API endpoint to become unavailable.
 4. Recreated the API container using Docker Compose.
 5. Verified that the API was healthy on port 39001.
 6. Verified that port 3000 was unavailable.
-7. Triggered automatic rollback.
+7. Called the script's configuration restoration function.
 8. Restored the original Docker Compose configuration.
 9. Recreated the API container using the original configuration.
 10. Verified that the API was healthy on port 3000.
@@ -31,7 +31,7 @@ causes the original API endpoint to become unavailable.
 
 ## Final Result
 
-AUTOMATIC ROLLBACK TEST PASSED.
+CONFIGURATION ROLLBACK SIMULATION PASSED.
 
 API health response:
 
@@ -43,10 +43,9 @@ Original port mapping:
 
 ## Conclusion
 
-The automatic rollback mechanism successfully restored
+The configuration restoration function successfully restored
 the original application configuration and recovered
-the API after the simulated deployment failure.
+the API after the simulated configuration change.
 
 The test was performed on the isolated test EC2.
 The production deployment was not modified.
-EOFcat > docs/evidence/automatic-rollback-test.md <<'EOF'

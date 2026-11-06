@@ -1,0 +1,24 @@
+CI WORKFLOW EVIDENCE
+
+Repository: Mohamedarshad-alt/devops-final-project
+Workflow: CI - Test API
+Run number: 21
+Commit: 53c5494
+Branch: main
+Trigger: Push
+Date: 2026-11-04
+Status: Success
+Duration: 13 seconds
+
+Workflow run:
+https://github.com/Mohamedarshad-alt/devops-final-project/actions/runs/41815240408
+
+Workflow file:
+.github/workflows/ci.yml
+
+Local application test evidence:
+../application/automated-tests.txt
+
+Note:
+The GitHub Actions run completed successfully.
+GitHub displayed one warning and one notice about runner/action runtime changes.

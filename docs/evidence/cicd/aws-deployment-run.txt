@@ -1,0 +1,32 @@
+AWS OIDC AND DEPLOYMENT WORKFLOW EVIDENCE
+
+Repository:
+Mohamedarshad-alt/devops-final-project
+
+Workflow:
+Validate, Publish and Deploy Docker Image
+
+Run:
+#11
+
+Commit:
+53c5494
+
+Branch:
+main
+
+Overall status:
+Success
+
+Workflow run:
+https://github.com/Mohamedarshad-alt/devops-final-project/actions/runs/41815240218
+
+Deployment job:
+Deploy to EC2 with automatic rollback
+
+Production environment:
+Approval recorded on November 4, 2026.
+
+Important:
+The overall workflow and deployment job completed successfully.
+The AWS OIDC credentials step was individually verified as successful. The SSM connection details were not independently verified in this evidence file.
