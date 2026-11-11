@@ -15,7 +15,7 @@ test("GET /health returns healthy when database responds", async () => {
 
   assert.equal(response.status, 200);
   assert.equal(response.body.status, "healthy");
-  assert.equal(response.body.database, "connected");
+  assert.equal(response.body.database, "Successfully connected");
 });
 
 test("GET /health returns 503 when database is unavailable", async () => {
