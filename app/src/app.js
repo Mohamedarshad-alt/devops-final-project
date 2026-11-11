@@ -72,7 +72,7 @@ function createApp(pool) {
 
       res.status(200).json({
         status: 'healthy',
-        database: 'connected'
+        database: 'Successfully connected'
       });
     } catch (error) {
       res.status(503).json({
