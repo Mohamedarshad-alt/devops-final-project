@@ -30,3 +30,4 @@ infra/ansible/inventory.local.ini
 
 # Real local Ansible inventory
 infra/ansible/inventory.ini
+infra/ansible/files/test-compose.yml.backup

@@ -8,6 +8,7 @@
     postgres_user: devops_test_user
     postgres_db: devops_test_db
     api_image: "ghcr.io/mohamedarshad-alt/devops-final-project:sha-dc985bea520b1006bc8bbe015c8cb50badfa7a67"
+    nginx_image: "ghcr.io/mohamedarshad-alt/devops-final-project-frontend:main"
 
   tasks:
     - name: Create test deployment directory
@@ -39,6 +40,16 @@
     - name: Set secure environment file permissions
       ansible.builtin.file:
         path: "{{ deployment_dir }}/.env"
+        owner: root
+        group: root
+        mode: "0600"
+
+    - name: Add or update frontend image without changing other environment settings
+      ansible.builtin.lineinfile:
+        path: "{{ deployment_dir }}/.env"
+        regexp: '^NGINX_IMAGE='
+        line: "NGINX_IMAGE={{ nginx_image }}"
+        create: false
         owner: root
         group: root
         mode: "0600"

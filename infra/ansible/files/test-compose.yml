@@ -1,3 +1,4 @@
+
 services:
   db:
     image: postgres:16-alpine
@@ -60,6 +61,24 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    networks:
+      - test-network
+
+  nginx:
+    image: ${NGINX_IMAGE:?NGINX_IMAGE is required}
+    restart: unless-stopped
+    mem_limit: 96m
+    ports:
+      - "127.0.0.1:8080:80"
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      - api
     networks:
       - test-network
 

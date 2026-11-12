@@ -1,3 +1,4 @@
+
 data "aws_vpc" "default" {
   default = true
 }
@@ -18,26 +19,13 @@ data "aws_subnet" "selected" {
   id = sort(data.aws_subnets.default.ids)[0]
 }
 
-data "aws_ami" "ubuntu" {
-  most_recent = true
-  owners      = ["099720109477"]
-
-  filter {
-    name   = "name"
-    values = ["ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*"]
-  }
-
-  filter {
-    name   = "architecture"
-    values = ["x86_64"]
-  }
-
-  filter {
-    name   = "virtualization-type"
-    values = ["hvm"]
-  }
+# Pin the AMI currently used by both existing EC2 instances.
+# Update this deliberately when planning an Ubuntu upgrade.
+locals {
+  ubuntu_ami_id = "ami-0fc5120b2d80d4749"
 }
 
+# Application EC2 security group.
 resource "aws_security_group" "app" {
   name        = "${var.project_name}-sg"
   description = "Restricted SSH and public web traffic"
@@ -81,8 +69,9 @@ resource "aws_security_group" "app" {
   }
 }
 
+# Main application EC2 instance.
 resource "aws_instance" "app" {
-  ami                         = data.aws_ami.ubuntu.id
+  ami                         = local.ubuntu_ami_id
   instance_type               = var.instance_type
   subnet_id                   = data.aws_subnet.selected.id
   vpc_security_group_ids      = [aws_security_group.app.id]
@@ -114,6 +103,7 @@ data "aws_iam_instance_profile" "devops_ssm" {
 }
 
 # Separate security group for the test EC2 instance.
+# No inbound rules yet; SSM is used for administration.
 resource "aws_security_group" "test" {
   name        = "${var.project_name}-test-sg"
   description = "Outbound access only for test EC2 through SSM"
@@ -136,7 +126,7 @@ resource "aws_security_group" "test" {
 
 # Separate test EC2 instance.
 resource "aws_instance" "test" {
-  ami                         = data.aws_ami.ubuntu.id
+  ami                         = local.ubuntu_ami_id
   instance_type               = var.instance_type
   subnet_id                   = data.aws_subnet.selected.id
   vpc_security_group_ids      = [aws_security_group.test.id]

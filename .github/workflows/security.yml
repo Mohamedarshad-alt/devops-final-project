@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   dependency-scan:
-    name: Scan npm dependencies
+    name: Scan API and Frontend Dependencies
     runs-on: ubuntu-latest
 
     steps:
@@ -24,18 +24,30 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: app/package-lock.json
+          cache-dependency-path: |
+            app/package-lock.json
+            frontend/package-lock.json
 
-      - name: Install dependencies
+      # API dependency scan
+      - name: Install API dependencies
         working-directory: app
         run: npm ci
 
-      - name: Audit dependencies
+      - name: Audit API dependencies
         working-directory: app
         run: npm audit --audit-level=high
 
+      # Frontend dependency scan
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Audit frontend dependencies
+        working-directory: frontend
+        run: npm audit --audit-level=high
+
   source-scan:
-    name: Scan source code with Semgrep
+    name: Scan API and Frontend Source Code
     runs-on: ubuntu-latest
 
     steps:
@@ -45,21 +57,22 @@ jobs:
       - name: Install Semgrep
         run: python -m pip install semgrep
 
-      - name: Scan application
-        run: semgrep scan --config auto app/src
+      - name: Scan application source code
+        run: semgrep scan --config auto app/src frontend/src
 
   container-scan:
-    name: Scan Docker image with Trivy
+    name: Scan API and Frontend Docker Images
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Build Docker image
+      # Build API image
+      - name: Build API Docker image
         run: docker build -f docker/Dockerfile -t devops-final-api:scan .
 
-      - name: Scan image for vulnerabilities
+      - name: Scan API image with Trivy
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: devops-final-api:scan
@@ -68,8 +81,21 @@ jobs:
           ignore-unfixed: true
           exit-code: '1'
 
+      # Build frontend Nginx image
+      - name: Build frontend Docker image
+        run: docker build -f nginx/Dockerfile -t devops-final-frontend:scan .
+
+      - name: Scan frontend image with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: devops-final-frontend:scan
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
   secret-scan:
-    name: Scan repository for exposed secrets
+    name: Scan Repository for Exposed Secrets
     runs-on: ubuntu-latest
 
     steps:
