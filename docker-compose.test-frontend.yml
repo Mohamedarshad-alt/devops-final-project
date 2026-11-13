@@ -3,9 +3,6 @@ services:
     image: ${NGINX_IMAGE:-ghcr.io/mohamedarshad-alt/devops-final-project-frontend:main}
     restart: unless-stopped
 
-    ports:
-      - "127.0.0.1:8080:80"
-
     depends_on:
       api:
         condition: service_started
@@ -25,9 +22,6 @@ services:
       - CHOWN
       - SETUID
       - SETGID
-
-    security_opt:
-      - no-new-privileges:true
 
     logging:
       driver: json-file

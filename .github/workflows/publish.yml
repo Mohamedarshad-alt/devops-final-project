@@ -229,26 +229,36 @@ jobs:
 
           cd /opt/devops-test
 
-          TEST_COMPOSE_B64="__TEST_COMPOSE_B64__"
-          printf '%s' "$TEST_COMPOSE_B64" | base64 -d > docker-compose.test-frontend.yml
-          chmod 600 docker-compose.test-frontend.yml
+          # Stage incoming Compose files without replacing active files.
 
-          COMPOSE="docker compose --env-file .env -f compose.yml -f docker-compose.test-frontend.yml"
+          BASE_COMPOSE_B64="__BASE_COMPOSE_B64__"
+          printf '%s' "$BASE_COMPOSE_B64" | base64 -d > compose.yml.candidate
+          chmod 600 compose.yml.candidate
+
+          TEST_COMPOSE_B64="__TEST_COMPOSE_B64__"
+          printf '%s' "$TEST_COMPOSE_B64" | base64 -d > docker-compose.test-frontend.yml.candidate
+          chmod 600 docker-compose.test-frontend.yml.candidate
+
           NEW_IMAGE="__NEW_IMAGE__"
 
-          echo "Validating merged Docker Compose configuration..."
+          COMPOSE_CANDIDATE="docker compose --env-file .env -f compose.yml.candidate -f docker-compose.test-frontend.yml.candidate"
 
-          if ! NGINX_IMAGE="$NEW_IMAGE" $COMPOSE config --quiet; then
-            echo "ERROR: Merged Docker Compose configuration is invalid."
+          # Remove temporary files if this script exits before activating them.
+          trap 'rm -f compose.yml.candidate docker-compose.test-frontend.yml.candidate' EXIT
+
+          echo "Validating staged Docker Compose configuration..."
+
+          if ! NGINX_IMAGE="$NEW_IMAGE" $COMPOSE_CANDIDATE config --quiet; then
+            echo "ERROR: Staged Docker Compose configuration is invalid."
             exit 1
           fi
 
-          echo "Merged Docker Compose configuration is valid."
+          echo "Staged Docker Compose configuration is valid."
 
           echo "Checking existing API and database containers..."
 
-          API_BEFORE=$($COMPOSE ps -q api)
-          DB_BEFORE=$($COMPOSE ps -q db)
+          API_BEFORE=$($COMPOSE_CANDIDATE ps -q api)
+          DB_BEFORE=$($COMPOSE_CANDIDATE ps -q db)
 
           if [ -z "$API_BEFORE" ] || [ -z "$DB_BEFORE" ]; then
             echo "ERROR: Existing API or database container is missing."
@@ -262,7 +272,7 @@ jobs:
           # Detect existing Nginx deployment
           # --------------------------------------
 
-          NGINX_BEFORE=$($COMPOSE ps -q nginx)
+          NGINX_BEFORE=$($COMPOSE_CANDIDATE ps -q nginx)
           PREVIOUS_IMAGE=""
 
           if [ -n "$NGINX_BEFORE" ]; then
@@ -290,6 +300,60 @@ jobs:
           fi
 
           # --------------------------------------
+          # Pull image before changing active files
+          # --------------------------------------
+
+          echo "Pulling new frontend image..."
+
+          if ! NGINX_IMAGE="$NEW_IMAGE" $COMPOSE_CANDIDATE pull nginx; then
+            echo "ERROR: Frontend image pull failed."
+            exit 1
+          fi
+
+          # Back up active Compose files before activating the candidates.
+
+          echo "Preparing Compose activation backups..."
+
+          BACKUP_DIR=$(mktemp -d .compose-activation-backup.XXXXXX)
+
+          if ! cp -p compose.yml "$BACKUP_DIR/compose.yml" ||
+             ! cp -p docker-compose.test-frontend.yml "$BACKUP_DIR/docker-compose.test-frontend.yml"; then
+            echo "ERROR: Could not back up active Compose files."
+            exit 1
+          fi
+
+          echo "Activating validated Compose files..."
+
+          if ! mv -f compose.yml.candidate compose.yml; then
+            echo "ERROR: Could not activate the base Compose file."
+            rm -f "$BACKUP_DIR/compose.yml" "$BACKUP_DIR/docker-compose.test-frontend.yml"
+            rmdir "$BACKUP_DIR"
+            exit 1
+          fi
+
+          if ! mv -f docker-compose.test-frontend.yml.candidate docker-compose.test-frontend.yml; then
+            echo "ERROR: Could not activate the frontend overlay."
+            echo "Restoring the original base Compose file..."
+
+            if cp -p "$BACKUP_DIR/compose.yml" compose.yml; then
+              echo "Original base Compose file restored."
+              rm -f "$BACKUP_DIR/compose.yml" "$BACKUP_DIR/docker-compose.test-frontend.yml"
+              rmdir "$BACKUP_DIR"
+            else
+              echo "CRITICAL: Automatic restoration failed."
+              echo "Backup files retained in: $BACKUP_DIR"
+            fi
+
+            exit 1
+          fi
+
+          # Both files are now activated successfully.
+          rm -f "$BACKUP_DIR/compose.yml" "$BACKUP_DIR/docker-compose.test-frontend.yml"
+          rmdir "$BACKUP_DIR"
+
+          COMPOSE="docker compose --env-file .env -f compose.yml -f docker-compose.test-frontend.yml"
+
+          # --------------------------------------
           # Rollback function
           # --------------------------------------
 
@@ -309,8 +373,8 @@ jobs:
               fi
 
               for i in $(seq 1 30); do
-                if curl -fsS http://127.0.0.1:8080/ >/dev/null &&
-                   curl -fsS http://127.0.0.1:8080/health >/dev/null; then
+                if curl -fsS http://127.0.0.1:80/ >/dev/null &&
+                   curl -fsS http://127.0.0.1:80/health >/dev/null; then
 
                   echo "Previous frontend restored successfully."
                   exit 1
@@ -339,17 +403,6 @@ jobs:
           }
 
           # --------------------------------------
-          # Pull new frontend image
-          # --------------------------------------
-
-          echo "Pulling new frontend image..."
-
-          if ! NGINX_IMAGE="$NEW_IMAGE" $COMPOSE pull nginx; then
-            echo "ERROR: Frontend image pull failed."
-            exit 1
-          fi
-
-          # --------------------------------------
           # Deploy frontend only
           # --------------------------------------
 
@@ -368,8 +421,8 @@ jobs:
 
           for i in $(seq 1 30); do
 
-            if curl -fsS http://127.0.0.1:8080/ >/dev/null &&
-               curl -fsS http://127.0.0.1:8080/health >/dev/null; then
+            if curl -fsS http://127.0.0.1:80/ >/dev/null &&
+               curl -fsS http://127.0.0.1:80/health >/dev/null; then
 
               echo "Website and API health checks passed."
 
@@ -394,13 +447,13 @@ jobs:
               echo "Checking protected monitoring endpoints..."
 
               METRICS_STATUS=$(curl -s -o /dev/null -w '%{http_code}' \
-                http://127.0.0.1:8080/metrics)
+                http://127.0.0.1:80/metrics)
 
               PROMETHEUS_STATUS=$(curl -s -o /dev/null -w '%{http_code}' \
-                http://127.0.0.1:8080/prometheus/)
+                http://127.0.0.1:80/prometheus/)
 
               GRAFANA_STATUS=$(curl -s -o /dev/null -w '%{http_code}' \
-                http://127.0.0.1:8080/grafana/)
+                http://127.0.0.1:80/grafana/)
 
               if [ "$METRICS_STATUS" != "404" ] ||
                  [ "$PROMETHEUS_STATUS" != "404" ] ||
@@ -467,6 +520,9 @@ jobs:
           )
 
           SCRIPT="${SCRIPT//__NEW_IMAGE__/$NEW_IMAGE}"
+
+          BASE_COMPOSE_B64=$(base64 -w0 infra/ansible/files/test-compose.yml)
+          SCRIPT="${SCRIPT//__BASE_COMPOSE_B64__/$BASE_COMPOSE_B64}"
 
           TEST_COMPOSE_B64=$(base64 -w0 docker-compose.test-frontend.yml)
           SCRIPT="${SCRIPT//__TEST_COMPOSE_B64__/$TEST_COMPOSE_B64}"
