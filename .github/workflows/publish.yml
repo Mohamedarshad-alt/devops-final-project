@@ -735,8 +735,36 @@ jobs:
             rollback
           fi
 
-          if ! curl -fsS http://127.0.0.1/api/v1/items >/dev/null; then
-            echo "ERROR: GET items through Nginx failed."
+          echo "Waiting for GET /api/v1/items through Nginx..."
+
+          ITEMS_READY=0
+          RESPONSE_FILE="/tmp/devops-items-response.json"
+          HTTP_CODE="000"
+
+          for i in $(seq 1 20); do
+            HTTP_CODE=$(curl -sS --max-time 2 \
+              -o "$RESPONSE_FILE" \
+              -w '%{http_code}' \
+              http://127.0.0.1/api/v1/items || true)
+
+            if [ "$HTTP_CODE" = "200" ]; then
+              ITEMS_READY=1
+              break
+            fi
+
+            echo "Attempt $i/20: items endpoint returned HTTP $HTTP_CODE."
+            if [ "$i" -lt 20 ]; then sleep 1; fi
+          done
+
+          if [ "$ITEMS_READY" -ne 1 ]; then
+            echo "ERROR: GET items through Nginx failed after retries."
+            echo "Last HTTP status: $HTTP_CODE"
+            echo "Last response body:"
+            cat "$RESPONSE_FILE" 2>/dev/null || true
+            echo "API logs:"
+            $COMPOSE logs --tail=80 api || true
+            echo "Nginx logs:"
+            $COMPOSE logs --tail=80 nginx || true
             rollback
           fi
 
