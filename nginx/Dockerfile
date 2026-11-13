@@ -13,7 +13,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # Stage 2: Nginx reverse proxy
-FROM nginx:1.27-alpine
+FROM nginx:1.30.6-alpine3.24-slim
 
 # Remove default Nginx configuration
 RUN rm /etc/nginx/conf.d/default.conf
