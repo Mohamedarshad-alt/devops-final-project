@@ -589,6 +589,351 @@ jobs:
 
           echo "Timed out waiting for the test deployment."
           exit 1
+
+  # ==========================================
+  # JOB 4: DEPLOY API TO TEST EC2
+  # AUTOMATIC ROLLBACK + CRUD SMOKE TESTS
+  # ==========================================
+  deploy-test-api:
+    name: Deploy API to TEST EC2
+    environment: test
+    needs: [publish, deploy-test]
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Configure AWS credentials using GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::788516091241:role/GitHubActionsDevOpsDeployRole
+          aws-region: ap-south-1
+
+      - name: Deploy API with automatic rollback
+        shell: bash
+        env:
+          DEPLOY_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          NEW_IMAGE="ghcr.io/mohamedarshad-alt/devops-final-project:sha-${DEPLOY_SHA}"
+
+          echo "======================================"
+          echo "TEST API DEPLOYMENT"
+          echo "======================================"
+          echo "New API image: ${NEW_IMAGE}"
+
+          SCRIPT=$(cat <<'REMOTE_SCRIPT'
+          set -eu
+
+          cd /opt/devops-test
+
+          NEW_IMAGE="__NEW_IMAGE__"
+          COMPOSE="docker compose --env-file .env -f compose.yml -f docker-compose.test-frontend.yml"
+
+          echo "Checking existing containers..."
+
+          API_BEFORE=$($COMPOSE ps -q api)
+          DB_BEFORE=$($COMPOSE ps -q db)
+          NGINX_BEFORE=$($COMPOSE ps -q nginx)
+
+          if [ -z "$API_BEFORE" ] || [ -z "$DB_BEFORE" ] || [ -z "$NGINX_BEFORE" ]; then
+            echo "ERROR: API, database, or Nginx container is missing."
+            exit 1
+          fi
+
+          PREVIOUS_IMAGE=$(docker inspect --format '{{.Config.Image}}' "$API_BEFORE")
+
+          if [ -z "$PREVIOUS_IMAGE" ]; then
+            echo "ERROR: Could not identify previous API image."
+            exit 1
+          fi
+
+          echo "Previous API image: $PREVIOUS_IMAGE"
+          echo "New API image: $NEW_IMAGE"
+
+          SMOKE_ID=""
+
+          rollback() {
+            echo "======================================"
+            echo "STARTING API ROLLBACK"
+            echo "======================================"
+
+            if [ -z "${SMOKE_ID:-}" ] && [ -n "${SMOKE_NAME:-}" ]; then
+              echo "Looking up temporary task by its unique name..."
+              SMOKE_ID=$(curl -fsS http://127.0.0.1/api/v1/items | python3 -c 'import json,sys; data=json.load(sys.stdin); items=data.get("items", []) if isinstance(data,dict) else data; print(next((str(x["id"]) for x in items if x.get("name")==sys.argv[1] and x.get("id") is not None), ""))' "$SMOKE_NAME" 2>/dev/null || true)
+            fi
+
+            if [ -n "$SMOKE_ID" ]; then
+              echo "Attempting to remove temporary smoke-test task..."
+              curl -sS -X DELETE \
+                "http://127.0.0.1/api/v1/items/$SMOKE_ID" >/dev/null || true
+            fi
+
+            if ! API_IMAGE="$PREVIOUS_IMAGE" $COMPOSE up -d --no-deps api; then
+              echo "CRITICAL: Could not restore previous API image."
+              $COMPOSE logs --tail=100 api || true
+              exit 1
+            fi
+
+            echo "Checking previous API health..."
+
+            for i in $(seq 1 30); do
+              if curl -fsS http://127.0.0.1:3000/health >/dev/null; then
+                echo "ROLLBACK SUCCESSFUL: Previous API is healthy."
+                exit 1
+              fi
+              sleep 2
+            done
+
+            echo "CRITICAL: Previous API health check failed."
+            $COMPOSE logs --tail=100 api || true
+            exit 1
+          }
+
+          echo "Pulling the new API image..."
+
+          if ! API_IMAGE="$NEW_IMAGE" $COMPOSE pull api; then
+            echo "ERROR: API image pull failed. Existing API remains unchanged."
+            exit 1
+          fi
+
+          echo "Deploying the new API container..."
+
+          if ! API_IMAGE="$NEW_IMAGE" $COMPOSE up -d --no-deps api; then
+            echo "ERROR: API deployment command failed."
+            rollback
+          fi
+
+          echo "Checking API health..."
+
+          HEALTHY=0
+
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3000/health >/dev/null; then
+              HEALTHY=1
+              break
+            fi
+            sleep 2
+          done
+
+          if [ "$HEALTHY" -ne 1 ]; then
+            echo "ERROR: New API did not become healthy."
+            $COMPOSE logs --tail=80 api || true
+            rollback
+          fi
+
+          echo "API health check passed."
+
+          echo "Checking frontend-to-API connectivity..."
+
+          if ! curl -fsS http://127.0.0.1/health >/dev/null; then
+            echo "ERROR: Nginx cannot reach the API."
+            rollback
+          fi
+
+          if ! curl -fsS http://127.0.0.1/api/v1/items >/dev/null; then
+            echo "ERROR: GET items through Nginx failed."
+            rollback
+          fi
+
+          echo "GET endpoint through Nginx passed."
+
+          echo "======================================"
+          echo "RUNNING CRUD SMOKE TESTS"
+          echo "======================================"
+
+          SMOKE_NAME="deployment-smoke-test-$(date +%s)-$$"
+
+          echo "Testing POST..."
+
+          if ! CREATE_RESPONSE=$(curl -fsS \
+            -X POST http://127.0.0.1/api/v1/items \
+            -H 'Content-Type: application/json' \
+            -d "{\"name\":\"$SMOKE_NAME\",\"description\":\"Temporary deployment verification\"}"); then
+            echo "ERROR: POST request failed."
+            rollback
+          fi
+
+          if ! SMOKE_ID=$(printf '%s' "$CREATE_RESPONSE" | python3 -c \
+            'import json,sys; print(json.load(sys.stdin)["item"]["id"])'); then
+            echo "ERROR: Could not read created task ID."
+            rollback
+          fi
+
+          if [ -z "$SMOKE_ID" ]; then
+            echo "ERROR: Created task ID is empty."
+            rollback
+          fi
+
+          echo "POST passed. Temporary task ID: $SMOKE_ID"
+
+          echo "Testing PATCH..."
+
+          if ! PATCH_RESPONSE=$(curl -fsS \
+            -X PATCH "http://127.0.0.1/api/v1/items/$SMOKE_ID" \
+            -H 'Content-Type: application/json' \
+            -d '{"completed":true}'); then
+            echo "ERROR: PATCH request failed."
+            rollback
+          fi
+
+          if ! printf '%s' "$PATCH_RESPONSE" | python3 -c \
+            'import json,sys; item=json.load(sys.stdin)["item"]; assert item["completed"] is True'; then
+            echo "ERROR: PATCH did not update task completion."
+            rollback
+          fi
+
+          echo "PATCH passed."
+
+          echo "Testing DELETE..."
+
+          if ! DELETE_RESPONSE=$(curl -fsS \
+            -X DELETE "http://127.0.0.1/api/v1/items/$SMOKE_ID"); then
+            echo "ERROR: DELETE request failed."
+            rollback
+          fi
+
+          if ! printf '%s' "$DELETE_RESPONSE" | python3 -c \
+            'import json,sys; data=json.load(sys.stdin); assert data["message"] == "Task deleted successfully"'; then
+            echo "ERROR: DELETE response was unexpected."
+            rollback
+          fi
+
+          SMOKE_ID=""
+          echo "DELETE passed. Temporary task removed."
+
+          echo "======================================"
+          echo "VERIFYING DATABASE AND NGINX UNCHANGED"
+          echo "======================================"
+
+          DB_AFTER=$($COMPOSE ps -q db)
+          NGINX_AFTER=$($COMPOSE ps -q nginx)
+
+          if [ "$DB_BEFORE" != "$DB_AFTER" ]; then
+            echo "ERROR: Database container changed unexpectedly."
+            rollback
+          fi
+
+          if [ "$NGINX_BEFORE" != "$NGINX_AFTER" ]; then
+            echo "ERROR: Nginx container changed unexpectedly."
+            rollback
+          fi
+
+          echo "Database container unchanged."
+          echo "Nginx container unchanged."
+
+          echo "Saving successfully deployed API image..."
+
+          if ! ENV_TMP=$(mktemp .env.api.XXXXXX); then
+            echo "ERROR: Could not create temporary environment file."
+            rollback
+          fi
+
+          if ! cp .env "$ENV_TMP"; then
+            rm -f "$ENV_TMP"
+            echo "ERROR: Could not back up environment file."
+            rollback
+          fi
+
+          if grep -q '^API_IMAGE=' "$ENV_TMP"; then
+            if ! sed -i "s|^API_IMAGE=.*|API_IMAGE=$NEW_IMAGE|" "$ENV_TMP"; then
+              rm -f "$ENV_TMP"
+              echo "ERROR: Could not update API_IMAGE."
+              rollback
+            fi
+          else
+            if ! printf '%s\n' "API_IMAGE=$NEW_IMAGE" >> "$ENV_TMP"; then
+              rm -f "$ENV_TMP"
+              echo "ERROR: Could not add API_IMAGE."
+              rollback
+            fi
+          fi
+
+          if ! chmod 600 "$ENV_TMP"; then
+            rm -f "$ENV_TMP"
+            echo "ERROR: Could not set environment file permissions."
+            rollback
+          fi
+
+          if ! mv -f "$ENV_TMP" .env; then
+            rm -f "$ENV_TMP"
+            echo "ERROR: Could not save API image configuration."
+            rollback
+          fi
+
+          echo "======================================"
+          echo "TEST API DEPLOYMENT SUCCESSFUL"
+          echo "======================================"
+          echo "API image: $NEW_IMAGE"
+          echo "Health check: PASSED"
+          echo "GET: PASSED"
+          echo "POST: PASSED"
+          echo "PATCH: PASSED"
+          echo "DELETE: PASSED"
+          echo "Database container: UNCHANGED"
+          echo "Nginx container: UNCHANGED"
+          echo "Database volume: PRESERVED"
+          REMOTE_SCRIPT
+          )
+
+          SCRIPT="${SCRIPT//__NEW_IMAGE__/$NEW_IMAGE}"
+
+          jq -n --arg script "$SCRIPT" \
+            '{commands: [$script]}' > ssm-parameters.json
+
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids i-0c4f68769d3bd1b69 \
+            --document-name AWS-RunShellScript \
+            --comment "Test API deployment ${DEPLOY_SHA} with CRUD checks and rollback" \
+            --parameters file://ssm-parameters.json \
+            --query 'Command.CommandId' \
+            --output text)
+
+          echo "SSM command ID: $COMMAND_ID"
+
+          for attempt in $(seq 1 120); do
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" \
+              --instance-id i-0c4f68769d3bd1b69 \
+              --query 'Status' \
+              --output text 2>/dev/null || true)
+
+            case "$STATUS" in
+              Success)
+                echo "Test API deployment succeeded."
+
+                aws ssm get-command-invocation \
+                  --command-id "$COMMAND_ID" \
+                  --instance-id i-0c4f68769d3bd1b69 \
+                  --query 'StandardOutputContent' \
+                  --output text
+
+                exit 0
+                ;;
+
+              Failed|TimedOut|Cancelled|Cancelling)
+                echo "Test API deployment failed: $STATUS"
+
+                aws ssm get-command-invocation \
+                  --command-id "$COMMAND_ID" \
+                  --instance-id i-0c4f68769d3bd1b69 \
+                  --query '{Status:Status,Output:StandardOutputContent,Error:StandardErrorContent}' \
+                  --output json
+
+                exit 1
+                ;;
+            esac
+
+            sleep 5
+          done
+
+          echo "Timed out waiting for the test API deployment."
+          exit 1
+
   deploy:
     name: Deploy to EC2 with automatic rollback
     environment: production
