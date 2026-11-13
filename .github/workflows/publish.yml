@@ -201,6 +201,9 @@ jobs:
       id-token: write
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Configure AWS credentials using GitHub OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -226,8 +229,21 @@ jobs:
 
           cd /opt/devops-test
 
-          COMPOSE="docker compose --env-file .env -f compose.yml"
+          TEST_COMPOSE_B64="__TEST_COMPOSE_B64__"
+          printf '%s' "$TEST_COMPOSE_B64" | base64 -d > docker-compose.test-frontend.yml
+          chmod 600 docker-compose.test-frontend.yml
+
+          COMPOSE="docker compose --env-file .env -f compose.yml -f docker-compose.test-frontend.yml"
           NEW_IMAGE="__NEW_IMAGE__"
+
+          echo "Validating merged Docker Compose configuration..."
+
+          if ! NGINX_IMAGE="$NEW_IMAGE" $COMPOSE config --quiet; then
+            echo "ERROR: Merged Docker Compose configuration is invalid."
+            exit 1
+          fi
+
+          echo "Merged Docker Compose configuration is valid."
 
           echo "Checking existing API and database containers..."
 
@@ -452,6 +468,9 @@ jobs:
 
           SCRIPT="${SCRIPT//__NEW_IMAGE__/$NEW_IMAGE}"
 
+          TEST_COMPOSE_B64=$(base64 -w0 docker-compose.test-frontend.yml)
+          SCRIPT="${SCRIPT//__TEST_COMPOSE_B64__/$TEST_COMPOSE_B64}"
+
           jq -n --arg script "$SCRIPT" \
             '{commands: [$script]}' > ssm-parameters.json
 
@@ -473,7 +492,7 @@ jobs:
           # Monitor SSM command status
           # --------------------------------------
 
-          for attempt in $(seq 1 60); do
+          for attempt in $(seq 1 120); do
 
             STATUS=$(aws ssm get-command-invocation \
               --command-id "$COMMAND_ID" \
